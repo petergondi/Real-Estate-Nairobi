@@ -1,79 +1,87 @@
-
-<!DOCTYPE html>
 <html>
 <head>
-    <meta charset='utf-8' />
-    <title>Display buildings in 3D</title>
-    <meta name='viewport' content='initial-scale=1,maximum-scale=1,user-scalable=no' />
-    <script src='https://api.tiles.mapbox.com/mapbox-gl-js/v0.49.0/mapbox-gl.js'></script>
-    <link href='https://api.tiles.mapbox.com/mapbox-gl-js/v0.49.0/mapbox-gl.css' rel='stylesheet' />
-    <style>
-        body { margin:0; padding:0; }
-        #map { position:absolute; top:0; bottom:0; width:100%; }
-    </style>
+<meta charset=utf-8 />
+<title>Turf.js Map</title>
+<meta name='viewport' content='initial-scale=1,maximum-scale=1,user-scalable=no' />
+<script src='https://api.mapbox.com/mapbox.js/v2.1.5/mapbox.js'></script>
+<link href='https://api.mapbox.com/mapbox.js/v2.1.5/mapbox.css' rel='stylesheet' />
+<link rel="stylesheet" href="https://stackpath.bootstrapcdn.com/bootstrap/4.1.3/css/bootstrap.min.css" integrity="sha384-MCw98/SFnGE8fJT3GXwEOngsV7Zt27NXFoaoApmYm81iuXoPkFOJwJ8ERdknLPMO" crossorigin="anonymous">
+<script src='https://api.mapbox.com/mapbox.js/plugins/turf/v1.3.0/turf.min.js'></script>
+<style>
+  body {
+    margin: 0;
+    padding: 0;
+  }
+
+  #map {
+    position: absolute;
+    top: 0;
+    bottom: 0;
+    width: 100%;
+  }
+</style>
 </head>
 <body>
 
-<div id='map'></div>
-<script>
-mapboxgl.accessToken = 'pk.eyJ1IjoicGV0ZXItZ29uZGkiLCJhIjoiY2pjdzgxeDVvM2c0MjMzbjBxMWpwejgyNCJ9.7j7oPlEESBpyuVg2Kd8SbQ';
-var map = new mapboxgl.Map({
-    style: 'mapbox://styles/mapbox/light-v9',
-    center: [36.8219,-1.2921],
-    zoom: 13,
-    pitch: 45,
-    bearing: -17.6,
-    container: 'map'
-});
+  <div id='map'></div>
+  <script>
+    L.mapbox.accessToken = 'pk.eyJ1IjoibWFwYm94IiwiYSI6ImNpejY5YzJzczA2ejIzM29hNGQ3emFsMXgifQ.az9JUrQP7klCgD3W-ueILQ';
 
-// The 'building' layer in the mapbox-streets vector source contains building-height
-// data from OpenStreetMap.
-map.on('load', function() {
-    // Insert the layer beneath any symbol layer.
-    var layers = map.getStyle().layers;
+    var hospitals = {
+      type: 'FeatureCollection',
+      features: [
+        { type: 'Feature', properties: { Name: 'VA Medical Center -- Leestown Division', Address: '2250 Leestown Rd' }, geometry: { type: 'Point', coordinates: [ 36.833074,-1.286327] } },
+        { type: 'Feature', properties: { Name: 'St. Joseph East', Address: '150 N Eagle Creek Dr' }, geometry: { type: 'Point', coordinates:[ 36.828267,-1.286735
+] } },
+        { type: 'Feature', properties: { Name: 'Central Baptist Hospital', Address: '1740 Nicholasville Rd' }, geometry: { type: 'Point', coordinates: [36.826604,-1.289384] } }
+      ]
+    };
+    
 
-    var labelLayerId;
-    for (var i = 0; i < layers.length; i++) {
-        if (layers[i].type === 'symbol' && layers[i].layout['text-field']) {
-            labelLayerId = layers[i].id;
-            break;
-        }
+    // Add marker color, symbol, and size to hospital GeoJSON
+    for (var i = 0; i < hospitals.features.length; i++) {
+      hospitals.features[i].properties['marker-color'] = '#DC143C';
+      hospitals.features[i].properties['marker-symbol'] = 'building';
+      hospitals.features[i].properties['marker-size'] = 'small';
     }
 
-    map.addLayer({
-        'id': '3d-buildings',
-        'source': 'composite',
-        'source-layer': 'building',
-        'filter': ['==', 'extrude', 'true'],
-        'type': 'fill-extrusion',
-        'minzoom': 15,
-        'paint': {
-            'fill-extrusion-color': '#aaa',
+    // Add marker color, symbol, and size to library GeoJSON
+    
+    var map = L.mapbox.map('map', 'mapbox.light')
+      .setView([-1.2921,36.8219], 13);
+    map.scrollWheelZoom.disable();
 
-            // use an 'interpolate' expression to add a smooth transition effect to the
-            // buildings as the user zooms in
-            'fill-extrusion-height': [
-                "interpolate", ["linear"], ["zoom"],
-                15, 0,
-                15.05, ["get", "height"]
-            ],
-            'fill-extrusion-base': [
-                "interpolate", ["linear"], ["zoom"],
-                15, 0,
-                15.05, ["get", "min_height"]
-            ],
-            'fill-extrusion-opacity': .2
-        }
-    }, labelLayerId);
-});
-map.addControl(new mapboxgl.NavigationControl());
-map.addControl(new mapboxgl.GeolocateControl({
-    positionOptions: {
-        enableHighAccuracy: true
-    },
-    trackUserLocation: true
-}));
-</script>
+    var hospitalLayer = L.mapbox.featureLayer(hospitals)
+   
 
+    // Bind a popup to each feature in hospitalLayer and libraryLayer
+    hospitalLayer.eachLayer(function(layer) {
+      layer.bindPopup('<strong>' + layer.feature.properties.Name +'<br/>'+ layer.feature.properties.Address+ '</strong>', { closeButton: false });
+    }).addTo(map);
+    
+
+   
+    hospitalLayer.on('mouseover', function(e) {
+      e.layer.openPopup();
+    });
+
+    // Reset marker size to small
+    function reset() {
+      var hospitalFeatures = hospitalLayer.getGeoJSON();
+      for (var k = 0; k < hospitalFeatures.features.length; k++) {
+        hospitalFeatures.features[k].properties['marker-size'] = 'small';
+      }
+      hospitalLayer.setGeoJSON(hospitalFeatures);
+    }
+
+    // When a library is clicked, do the following
+
+    // When the map is clicked on anywhere, reset all
+    // hospital markers to small
+    map.on('click', function(e) {
+      reset();
+    });
+
+  </script>
 </body>
 </html>
